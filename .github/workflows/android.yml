@@ -37,6 +37,15 @@ jobs:
           }
           EOF
 
+      - name: Mock Broken Windows Keystore Path
+        run: |
+          # Create a dummy keystore file inside the runner environment
+          touch mock_cert.jks
+          
+          # Force Linux to redirect the hardcoded Windows string to our dummy file
+          sudo mkdir -p "/C:/AndroidPROJ"
+          sudo ln -s "$(pwd)/mock_cert.jks" "/C:/AndroidPROJ/cert.jks"
+
       - name: Build Unsigned Release APK
         run: |
           cd Android-Project
@@ -44,9 +53,9 @@ jobs:
           # Accept Android SDK licenses automatically
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           
-          # Force Gradle to build standard unsigned release assets 
+          # Execute a standard release build sequence
           chmod +x gradlew
-          ./gradlew assembleRelease --init-script ~/.gradle/init.gradle -PsigningConfigs=null
+          ./gradlew assembleRelease --init-script ~/.gradle/init.gradle
 
       - name: Upload Unsigned APK Artifact
         uses: actions/upload-artifact@v4
