@@ -15,18 +15,39 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '8'
+          java-version: '8' # Sticking with Java 8 for old Gradle compatibility
+
+      - name: Inject Google Maven Repository
+        run: |
+          # Create a global Gradle init script to force-feed the Google and Maven Central repos
+          mkdir -p ~/.gradle
+          cat << 'EOF' > ~/.gradle/init.gradle
+          allprojects {
+              buildscript {
+                  repositories {
+                      google()
+                      mavenCentral()
+                      maven { url "https://google.com" }
+                  }
+              }
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url "https://google.com" }
+              }
+          }
+          EOF
 
       - name: Build Debug APK
         run: |
           cd Android-Project
           
-          # Accept Android licenses automatically using the system's pre-installed SDK
+          # Accept Android licenses automatically
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           
           # Make Gradle executable and compile
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --init-script ~/.gradle/init.gradle
 
       - name: Upload Compiled APK
         uses: actions/upload-artifact@v4
