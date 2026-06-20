@@ -1,4 +1,4 @@
-name: Sonic and galactic
+name: Android APK Generator
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
 
     - name: Build Android Engine APK
       run: |
-        cd android
+        cd Android-Project
         chmod +x gradlew
         ./gradlew assembleDebug
 
@@ -32,5 +32,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: Hatch-Android-Sonic-Galactic
-        path: android/app/build/outputs/apk/debug/app-debug.apk
+        path: Android-Project/app/build/outputs/apk/debug/app-debug.apk
         retention-days: 7
