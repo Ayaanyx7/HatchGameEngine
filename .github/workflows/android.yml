@@ -1,4 +1,4 @@
-name: Build Hatch Engine Android
+name: Build Hatch Engine Android (Release)
 
 on:
   workflow_dispatch:
@@ -15,11 +15,10 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '8' # Sticking with Java 8 for old Gradle compatibility
+          java-version: '8'
 
       - name: Inject Google Maven Repository
         run: |
-          # Create a global Gradle init script to force-feed the Google and Maven Central repos
           mkdir -p ~/.gradle
           cat << 'EOF' > ~/.gradle/init.gradle
           allprojects {
@@ -38,19 +37,38 @@ jobs:
           }
           EOF
 
-      - name: Build Debug APK
+      - name: Strip Windows Hardcoded Keystore Paths
+        run: |
+          # Completely strip out the broken signing setup from the configuration file
+          sed -i '/signingConfigs {/,/}/d' Android-Project/app/build.gradle
+          sed -i '/signingConfig signingConfigs./d' Android-Project/app/build.gradle
+
+      - name: Build Optimized Release APK
         run: |
           cd Android-Project
           
           # Accept Android licenses automatically
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           
-          # Make Gradle executable and compile
+          # Make Gradle executable and compile the optimized release binary
           chmod +x gradlew
-          ./gradlew assembleDebug --init-script ~/.gradle/init.gradle
+          ./gradlew assembleRelease --init-script ~/.gradle/init.gradle
 
-      - name: Upload Compiled APK
+      - name: Fast Sign Release APK with Test Key
+        run: |
+          # Locate the output unsigned release APK
+          UNSIGNED_APK=$(find Android-Project/app/build/outputs/apk/release/ -name "*-unsigned.apk" | head -n 1)
+          APK_DIR=$(dirname "$UNSIGNED_APK")
+          
+          # Generate a quick test keystore inside the runner environment
+          keytool -genkey -v -keystore test.keystore -alias testkey -keyalg RSA -keysize 2048 -validity 10000 -storepass password -keypass password -dname "CN=HatchRunner, OU=Dev, O=Hatch, L=Unknown, S=Unknown, C=US"
+          
+          # Sign the build so it is optimized AND runnable on your device
+          apksigner sign --ks test.keystore --ks-pass pass:password --out "$APK_DIR/Hatch-Engine-Release.apk" "$UNSIGNED_APK"
+          echo "Successfully generated high-performance signed Release APK"
+
+      - name: Upload Final Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hatch-Android-APK
-          path: Android-Project/app/build/outputs/apk/debug/*-debug.apk
+          name: Hatch-Android-Release-APK
+          path: Android-Project/app/build/outputs/apk/release/Hatch-Engine-Release.apk
