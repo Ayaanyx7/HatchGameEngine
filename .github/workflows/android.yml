@@ -1,4 +1,4 @@
-name: Build Android Performance Release (Repository Repo Fix)
+name: Build Android Performance Release (Final Battle Fix)
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
@@ -30,16 +30,25 @@ jobs:
         run: |
           sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1" "build-tools;30.0.3"
 
-      # Automating a direct patch to your build.gradle to bypass the dead JCenter servers
-      - name: Patch Dead Repositories (JCenter Fix)
+      # 1. Fixes the dead JCenter servers
+      # 2. Obliterates the broken "C:/AndroidPROJ/cert.jks" Windows path so the project compiles cleanly
+      - name: Patch Dead Repos and Remove Broken Windows Signing Path
         run: |
           sed -i 's/jcenter()/google()\n        mavenCentral()/g' Android-Project/build.gradle
           sed -i 's/jcenter()/google()\n        mavenCentral()/g' Android-Project/app/build.gradle
+          sed -i 's/signingConfigs/ \/\/ signingConfigs/g' Android-Project/app/build.gradle
+          sed -i 's/storeFile/ \/\/ storeFile/g' Android-Project/app/build.gradle
+          sed -i 's/signingConfig signingConfigs.release/ \/\/ signingConfig/g' Android-Project/app/build.gradle
 
-      # Double-checking permissions for your exact repository folder configuration
       - name: Make Gradle Executable
         run: chmod +x Android-Project/gradlew
 
+      # Sets local.properties to explicitly force the correct NDK version we downloaded
+      - name: Configure Local NDK Properties
+        run: |
+          echo "ndk.dir=$ANDROID_HOME/ndk/25.1.8937393" > Android-Project/local.properties
+
+      # Compiles your clean, high-performance APK files
       - name: Build APKs with Gradle (Forced Java 8 Environment)
         run: |
           cd Android-Project
