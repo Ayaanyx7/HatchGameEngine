@@ -1,103 +1,47 @@
-name: Build Hatch Engine Android (Unsigned Release)
-
-on:
-  workflow_dispatch:
+name: Build Android Performance Release (JDK 8)
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  build-android:
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up JDK 8
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '8'
 
-      - name: Inject Google Maven Repository
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK and Tools
         run: |
-          mkdir -p ~/.gradle
-          cat << 'EOF' > ~/.gradle/init.gradle
-          allprojects {
-              buildscript {
-                  repositories {
-                      google()
-                      mavenCentral()
-                      maven { url "https://google.com" }
-                  }
-              }
-              repositories {
-                  google()
-                  mavenCentral()
-                  maven { url "https://google.com" }
-              }
-          }
-          EOF
+          sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1" "build-tools;30.0.3"
 
-      - name: Fix Broken SDL2 Symbolic Link
+      - name: Make Gradle Executable
+        run: chmod +x android/gradlew
+
+      # Compiles both Debug and the clean Unsigned Release versions
+      - name: Build APKs with Gradle
         run: |
-          # Navigate to the native JNI folder layout
-          cd Android-Project/app/src/main/jni
-          
-          # Remove the broken text-symlink file blocking the build
-          rm -rf SDL2
-          
-          # Fetch an official source release of SDL2 for Android
-          curl -L https://github.com -o sdl2.tar.gz
-          tar -xzf sdl2.tar.gz
-          
-          # Rename the extracted directory to match what the build setup expects
-          mv SDL-release-2.28.5 SDL2
-          rm sdl2.tar.gz
-          echo "Successfully injected a fresh SDL2 library asset source."
+          cd android
+          ./gradlew assembleDebug assembleRelease --no-daemon
 
-      - name: Overwrite with Clean Gradle Configuration
-        run: |
-          cat << 'EOF' > Android-Project/app/build.gradle
-          apply plugin: 'com.android.application'
-
-          android {
-              compileSdkVersion 26
-              buildToolsVersion "26.0.2"
-
-              defaultConfig {
-                  applicationId "com.aknet.hatch"
-                  minSdkVersion 19
-                  targetSdkVersion 26
-                  versionCode 1
-                  versionName "1.0"
-              }
-
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-                  }
-              }
-          }
-
-          dependencies {
-              implementation fileTree(dir: 'libs', include: ['*.jar'])
-          }
-          EOF
-          echo "Successfully replaced build.gradle with a clean template."
-
-      - name: Build Unsigned Release APK
-        run: |
-          cd Android-Project
-          
-          # Accept Android SDK licenses automatically
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          
-          # Compile the high-performance production build assets
-          chmod +x gradlew
-          ./gradlew assembleRelease --init-script ~/.gradle/init.gradle
-
-      - name: Upload Unsigned APK Artifact
+      # Saves the slow testing version
+      - name: Upload Debug APK (Slow Testing)
         uses: actions/upload-artifact@v4
         with:
-          name: Hatch-Android-Unsigned-Release
-          path: ./**/build/outputs/apk/**/*.apk
+          name: HatchEngine-Debug-Slow
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      # Saves the clean high-performance version for you to sign manually
+      - name: Upload Unsigned Release APK (Max Performance)
+        uses: actions/upload-artifact@v4
+        with:
+          name: HatchEngine-Release-Unsigned
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
