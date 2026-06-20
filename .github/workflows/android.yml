@@ -10,9 +10,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: 'recursive' # Automatically pulls down nested repositories if any exist
-          symlinks: true          # CRITICAL: Forces GitHub to clone and preserve original symbolic links
 
       - name: Set up JDK 8
         uses: actions/setup-java@v4
@@ -39,6 +36,23 @@ jobs:
               }
           }
           EOF
+
+      - name: Fix Broken SDL2 Symbolic Link
+        run: |
+          # Navigate to the native JNI folder layout
+          cd Android-Project/app/src/main/jni
+          
+          # Remove the broken text-symlink file blocking the build
+          rm -rf SDL2
+          
+          # Fetch an official source release of SDL2 for Android
+          curl -L https://github.com -o sdl2.tar.gz
+          tar -xzf sdl2.tar.gz
+          
+          # Rename the extracted directory to match what the build setup expects
+          mv SDL-release-2.28.5 SDL2
+          rm sdl2.tar.gz
+          echo "Successfully injected a fresh SDL2 library asset source."
 
       - name: Overwrite with Clean Gradle Configuration
         run: |
@@ -78,7 +92,7 @@ jobs:
           # Accept Android SDK licenses automatically
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           
-          # Run the standard optimized compilation pipeline
+          # Compile the high-performance production build assets
           chmod +x gradlew
           ./gradlew assembleRelease --init-script ~/.gradle/init.gradle
 
