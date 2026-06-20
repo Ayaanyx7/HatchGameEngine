@@ -1,4 +1,4 @@
-name: Build Android Performance Release (Dual-Java Fix)
+name: Build Android Performance Release (Repository Repo Fix)
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
@@ -10,7 +10,6 @@ jobs:
         with:
           submodules: recursive
 
-      # Install Java 8 first so we can grab its exact system location
       - name: Set up JDK 8
         uses: actions/setup-java@v4
         id: setup-java8
@@ -18,7 +17,6 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
 
-      # Install Java 17 second so it becomes the default system environment for the SDK tools
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -28,15 +26,20 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      # Uses Java 17 to successfully pull down the C++ compiler tools without crashing
       - name: Install NDK and Tools
         run: |
           sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1" "build-tools;30.0.3"
 
+      # Automating a direct patch to your build.gradle to bypass the dead JCenter servers
+      - name: Patch Dead Repositories (JCenter Fix)
+        run: |
+          sed -i 's/jcenter()/google()\n        mavenCentral()/g' Android-Project/build.gradle
+          sed -i 's/jcenter()/google()\n        mavenCentral()/g' Android-Project/app/build.gradle
+
+      # Double-checking permissions for your exact repository folder configuration
       - name: Make Gradle Executable
         run: chmod +x Android-Project/gradlew
 
-      # Swaps the environment home variables back to Java 8 specifically for the project folder
       - name: Build APKs with Gradle (Forced Java 8 Environment)
         run: |
           cd Android-Project
