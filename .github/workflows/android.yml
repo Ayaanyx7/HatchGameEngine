@@ -11,24 +11,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '11' # Changed from 17 to 11 for older Gradle compatibility
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Build Debug APK
         run: |
-          # Change directory explicitly into the Android-Project folder
           cd Android-Project
-          
-          # Make the gradlew wrapper script executable
           chmod +x gradlew
-          
-          # Compile the ready-to-install debug app binary
           ./gradlew assembleDebug
 
       - name: Upload Compiled APK
