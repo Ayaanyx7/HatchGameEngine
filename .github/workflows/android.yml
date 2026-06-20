@@ -1,48 +1,34 @@
-name: Android APK Generator
+name: Android
 
 on:
-  push:
-    branches: [ master, main ]
   workflow_dispatch:
+  push:
 
 jobs:
-  build-apk:
-    runs-on: ubuntu-22.04
+  build:
+    runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
+      - uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-    - name: Setup Android SDK & NDK
-      uses: android-actions/setup-android@v3
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-    - name: Install Android NDK & CMake Components
-      run: |
-        sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1"
+      - name: Make gradlew executable
+        run: chmod +x Android-Project/gradlew
 
-    - name: Configure Engine Android Project via CMake
-      run: |
-        mkdir build-android
-        cmake -B build-android \
-          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_HOME/ndk/25.1.8937393/build/cmake/android.toolchain.cmake \
-          -DANDROID_ABI=arm64-v8a \
-          -DANDROID_PLATFORM=android-26 \
-          -DCMAKE_BUILD_TYPE=Release \
-          -S .
+      - name: Build APK
+        working-directory: Android-Project
+        run: ./gradlew assembleDebug
 
-    - name: Build Engine Native Binaries
-      run: |
-        cmake --build build-android --config Release --parallel 4
-
-    - name: Upload Output Shared Libraries
-      uses: actions/upload-artifact@v4
-      with:
-        name: Hatch-Android-Core-Library
-        path: build-android/
-        retention-days: 7
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: Android-Project/**/build/outputs/apk/**/*.apk
