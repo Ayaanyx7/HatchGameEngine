@@ -15,14 +15,16 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '11' # Changed from 17 to 11 for older Gradle compatibility
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+          java-version: '11'
 
       - name: Build Debug APK
         run: |
           cd Android-Project
+          
+          # Accept Android licenses automatically using the system's pre-installed SDK
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          
+          # Make Gradle executable and compile
           chmod +x gradlew
           ./gradlew assembleDebug
 
