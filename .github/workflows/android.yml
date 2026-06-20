@@ -1,4 +1,4 @@
-name: Build Android Performance Release (Fixed Grammar)
+name: Build Android Performance Release (Structural Fix)
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
         with:
           submodules: recursive
 
-      # Locks down Java 8 for compiling, Java 17 for running the modern SDK manager
+      # Pulls down Java 8 for compiling, Java 17 for running the modern SDK manager
       - name: Set up JDK 8
         uses: actions/setup-java@v4
         id: setup-java8
@@ -31,26 +31,27 @@ jobs:
         run: |
           sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1" "build-tools;30.0.3"
 
-      # Pure target lines: This removes the exact Windows lines but leaves all brackets intact
-      - name: Patch Dead Repos and Safely Comment Out Windows Cert Lines
+      # Structural Patching: Wipes out the dead JCenter repositories and deletes the entire signing block cleanly
+      - name: Patch Dead Repos and Delete Broken Windows Signing Configurations
         run: |
           sed -i 's/jcenter()/google()\n        mavenCentral()/g' Android-Project/build.gradle
           sed -i 's/jcenter()/google()\n        mavenCentral()/g' Android-Project/app/build.gradle
-          sed -i 's/storeFile file("C:\/AndroidPROJ\/cert.jks")/\/\/ storeFile file("C:\/AndroidPROJ\/cert.jks")/g' Android-Project/app/build.gradle
-          sed -i 's/storePassword "hatchgameengine"/\/\/ storePassword "hatchgameengine"/g' Android-Project/app/build.gradle
-          sed -i 's/keyAlias "hatch"/\/\/ keyAlias "hatch"/g' Android-Project/app/build.gradle
-          sed -i 's/keyPassword "hatchgameengine"/\/\/ keyPassword "hatchgameengine"/g' Android-Project/app/build.gradle
-          sed -i 's/signingConfig signingConfigs.release/\/\/ signingConfig signingConfigs.release/g' Android-Project/app/build.gradle
+          
+          # This deletes everything between the signingConfigs opening and closing statements completely
+          sed -i '/signingConfigs {/,/^    }/d' Android-Project/app/build.gradle
+          
+          # This wipes out the line that links the release build to those deleted configurations
+          sed -i '/signingConfig signingConfigs.release/d' Android-Project/app/build.gradle
 
       - name: Make Gradle Executable
         run: chmod +x Android-Project/gradlew
 
-      # Binds our legacy NDK directly to the engine workspace
+      # Maps our specific legacy NDK to the engine workspace
       - name: Configure Local NDK Properties
         run: |
           echo "ndk.dir=$ANDROID_HOME/ndk/25.1.8937393" > Android-Project/local.properties
 
-      # Compiles your smooth, high-performance APK deliverables
+      # Compiles your clean, high-performance APK deliverables
       - name: Build APKs with Gradle (Forced Java 8 Environment)
         run: |
           cd Android-Project
