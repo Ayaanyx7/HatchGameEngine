@@ -1,4 +1,4 @@
-name: Build Hatch Engine Android (Release)
+name: Build Hatch Engine Android (Unsigned Release)
 
 on:
   workflow_dispatch:
@@ -37,46 +37,19 @@ jobs:
           }
           EOF
 
-      - name: Build Optimized Release APK
+      - name: Build Unsigned Release APK
         run: |
           cd Android-Project
           
           # Accept Android SDK licenses automatically
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           
-          # Make Gradle executable
+          # Force Gradle to build standard unsigned release assets 
           chmod +x gradlew
-          
-          # Compile the release build while completely bypassing the broken Windows signing variables
-          ./gradlew assembleRelease \
-            --init-script ~/.gradle/init.gradle \
-            -Pandroid.injected.signing.store.file="" \
-            -Pandroid.injected.signing.store.password="" \
-            -Pandroid.injected.signing.key.alias="" \
-            -Pandroid.injected.signing.key.password="" || echo "Proceeding to look for build output..."
+          ./gradlew assembleRelease --init-script ~/.gradle/init.gradle -PsigningConfigs=null
 
-      - name: Fast Sign Release APK with Test Key
-        run: |
-          # Dynamic search for the compiled file inside output folders
-          UNSIGNED_APK=$(find Android-Project/app/build/outputs/apk/ -name "*-unsigned.apk" -o -name "*-release.apk" | head -n 1)
-          
-          if [ -z "$UNSIGNED_APK" ]; then
-            echo "❌ Error: Could not find any compiled release app binary!"
-            exit 1
-          fi
-          
-          APK_DIR=$(dirname "$UNSIGNED_APK")
-          echo "Found compiled app file at: $UNSIGNED_APK"
-          
-          # Generate a standard 2048-bit test keystore inside the automated VM environment
-          keytool -genkey -v -keystore test.keystore -alias testkey -keyalg RSA -keysize 2048 -validity 10000 -storepass password -keypass password -dname "CN=HatchRunner, OU=Dev, O=Hatch, L=Unknown, S=Unknown, C=US"
-          
-          # Manually sign the file so it can physically boot on your Android phone
-          apksigner sign --ks test.keystore --ks-pass pass:password --out "$APK_DIR/Hatch-Engine-Release.apk" "$UNSIGNED_APK"
-          echo "Successfully generated high-performance signed Release APK"
-
-      - name: Upload Final Release APK
+      - name: Upload Unsigned APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Hatch-Android-Release-APK
-          path: ./**/build/outputs/apk/**/Hatch-Engine-Release.apk
+          name: Hatch-Android-Unsigned-Release
+          path: ./**/build/outputs/apk/**/*.apk
