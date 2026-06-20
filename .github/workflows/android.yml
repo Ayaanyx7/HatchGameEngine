@@ -26,36 +26,47 @@ jobs:
                   repositories {
                       google()
                       mavenCentral()
-                      maven { url "https://maven.google.com" }
+                      maven { url "https://google.com" }
                   }
               }
               repositories {
                   google()
                   mavenCentral()
-                  maven { url "https://maven.google.com" }
+                  maven { url "https://google.com" }
               }
           }
           EOF
 
-      - name: Completely Remove Signing Block from Gradle File
+      - name: Overwrite with Clean Gradle Configuration
         run: |
-          python3 -c '
-          import re
+          cat << 'EOF' > Android-Project/app/build.gradle
+          apply plugin: 'com.android.application'
 
-          file_path = "Android-Project/app/build.gradle"
-          with open(file_path, "r") as f:
-              content = f.read()
+          android {
+              compileSdkVersion 26
+              buildToolsVersion "26.0.2"
 
-          # Remove the signingConfigs block completely without breaking formatting brackets
-          content = re.sub(r"signingConfigs\s*\{.*?\n\s*\}", "", content, flags=re.DOTALL)
+              defaultConfig {
+                  applicationId "com.aknet.hatch"
+                  minSdkVersion 19
+                  targetSdkVersion 26
+                  versionCode 1
+                  versionName "1.0"
+              }
 
-          # Delete the line inside release block that points to the deleted config
-          content = re.sub(r".*signingConfig\s+signingConfigs\..*", "", content)
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+                  }
+              }
+          }
 
-          with open(file_path, "w") as f:
-              f.write(content)
-          '
-          echo "Successfully scrubbed hardcoded Windows paths from build configurations."
+          dependencies {
+              implementation fileTree(dir: 'libs', include: ['*.jar'])
+          }
+          EOF
+          echo "Successfully replaced build.gradle with a clean template."
 
       - name: Build Unsigned Release APK
         run: |
