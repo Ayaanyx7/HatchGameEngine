@@ -26,25 +26,36 @@ jobs:
                   repositories {
                       google()
                       mavenCentral()
-                      maven { url "https://google.com" }
+                      maven { url "https://maven.google.com" }
                   }
               }
               repositories {
                   google()
                   mavenCentral()
-                  maven { url "https://google.com" }
+                  maven { url "https://maven.google.com" }
               }
           }
           EOF
 
-      - name: Mock Broken Windows Keystore Path
+      - name: Completely Remove Signing Block from Gradle File
         run: |
-          # Create a dummy keystore file inside the runner environment
-          touch mock_cert.jks
-          
-          # Force Linux to redirect the hardcoded Windows string to our dummy file
-          sudo mkdir -p "/C:/AndroidPROJ"
-          sudo ln -s "$(pwd)/mock_cert.jks" "/C:/AndroidPROJ/cert.jks"
+          python3 -c '
+          import re
+
+          file_path = "Android-Project/app/build.gradle"
+          with open(file_path, "r") as f:
+              content = f.read()
+
+          # Remove the signingConfigs block completely without breaking formatting brackets
+          content = re.sub(r"signingConfigs\s*\{.*?\n\s*\}", "", content, flags=re.DOTALL)
+
+          # Delete the line inside release block that points to the deleted config
+          content = re.sub(r".*signingConfig\s+signingConfigs\..*", "", content)
+
+          with open(file_path, "w") as f:
+              f.write(content)
+          '
+          echo "Successfully scrubbed hardcoded Windows paths from build configurations."
 
       - name: Build Unsigned Release APK
         run: |
@@ -53,7 +64,7 @@ jobs:
           # Accept Android SDK licenses automatically
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           
-          # Execute a standard release build sequence
+          # Run the standard optimized compilation pipeline
           chmod +x gradlew
           ./gradlew assembleRelease --init-script ~/.gradle/init.gradle
 
