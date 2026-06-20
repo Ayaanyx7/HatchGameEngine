@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
       with:
@@ -19,18 +19,30 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Android SDK & Tools
+    - name: Setup Android SDK & NDK
       uses: android-actions/setup-android@v3
 
-    - name: Build Android Engine APK
+    - name: Install Android NDK & CMake Components
       run: |
-        cd Android-Project
-        chmod +x gradlew
-        ./gradlew assembleDebug
+        sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1"
 
-    - name: Upload Finished APK Artifact
+    - name: Configure Engine Android Project via CMake
+      run: |
+        mkdir build-android
+        cmake -B build-android \
+          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_HOME/ndk/25.1.8937393/build/cmake/android.toolchain.cmake \
+          -DANDROID_ABI=arm64-v8a \
+          -DANDROID_PLATFORM=android-26 \
+          -DCMAKE_BUILD_TYPE=Release \
+          -S .
+
+    - name: Build Engine Native Binaries
+      run: |
+        cmake --build build-android --config Release --parallel 4
+
+    - name: Upload Output Shared Libraries
       uses: actions/upload-artifact@v4
       with:
-        name: Hatch-Android-Sonic-Galactic
-        path: Android-Project/app/build/outputs/apk/debug/app-debug.apk
+        name: Hatch-Android-Core-Library
+        path: build-android/
         retention-days: 7
