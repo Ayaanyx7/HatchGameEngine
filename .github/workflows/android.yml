@@ -1,4 +1,4 @@
-name: Build Android Performance Release (Structural Fix)
+name: Build Android Performance Release
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
@@ -10,14 +10,7 @@ jobs:
         with:
           submodules: recursive
 
-      # Pulls down Java 8 for compiling, Java 17 for running the modern SDK manager
-      - name: Set up JDK 8
-        uses: actions/setup-java@v4
-        id: setup-java8
-        with:
-          distribution: 'temurin'
-          java-version: '8'
-
+      # ONLY Set up JDK 17 globally so the Android tools can run without crashing
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -27,11 +20,15 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
+      # Automatically accept SDK licenses so the build doesn't hang forever
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses
+
       - name: Install NDK and Tools
         run: |
           sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1" "build-tools;30.0.3"
 
-      # Structural Patching: Wipes out the dead JCenter repositories and deletes the entire signing block cleanly
+      # Structural Patching: Wipes out JCenter and strips broken signing configurations
       - name: Patch Dead Repos and Delete Broken Windows Signing Configurations
         run: |
           sed -i 's/jcenter()/google()\n        mavenCentral()/g' Android-Project/build.gradle
@@ -51,12 +48,10 @@ jobs:
         run: |
           echo "ndk.dir=$ANDROID_HOME/ndk/25.1.8937393" > Android-Project/local.properties
 
-      # Compiles your clean, high-performance APK deliverables
-      - name: Build APKs with Gradle (Forced Java 8 Environment)
+      # Compiles the APKs using the system-wide JDK 17 (Gradle handles the internal Java 8 targeting automatically)
+      - name: Build APKs with Gradle
         run: |
           cd Android-Project
-          export JAVA_HOME="${{ steps.setup-java8.outputs.path }}"
-          export PATH="$JAVA_HOME/bin:$PATH"
           ./gradlew assembleDebug assembleRelease --no-daemon
 
       - name: Upload Debug APK (Slow Testing)
@@ -65,6 +60,7 @@ jobs:
           name: HatchEngine-Debug-Slow
           path: Android-Project/app/build/outputs/apk/debug/app-debug.apk
 
+      # Updated output path: Modern Gradle names the unsigned file "app-release-unsigned.apk"
       - name: Upload Unsigned Release APK (Max Performance)
         uses: actions/upload-artifact@v4
         with:
