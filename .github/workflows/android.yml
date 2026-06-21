@@ -1,4 +1,4 @@
-name: Build Android Performance Release (Structural Fix)
+name: I Want To Play Sonic Galactic So Bad
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
 
-       Cinderella's Ball: Initialize Android SDK Setup Environment
+      # Initialize Android SDK Setup Environment
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
