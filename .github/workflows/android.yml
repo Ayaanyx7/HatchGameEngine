@@ -1,4 +1,4 @@
-name: Build Android Performance Release
+name: Build Android Performance Release (Structural Fix)
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
@@ -10,17 +10,24 @@ jobs:
         with:
           submodules: recursive
 
-      # ONLY Set up JDK 17 globally so the Android tools can run without crashing
+      # Set up JDK 17 globally to handle modern Android tools and Gradle 7.5
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      # Automatically downloads an isolated JDK 8 instance for the source compiler
+      - name: Set up JDK 8 (Target Engine Compiler)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+
+       Cinderella's Ball: Initialize Android SDK Setup Environment
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      # Automatically accept SDK licenses so the build doesn't hang forever
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses
 
@@ -28,7 +35,7 @@ jobs:
         run: |
           sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1" "build-tools;30.0.3"
 
-      # Structural Patching: Wipes out JCenter and strips broken signing configurations
+      # Structural Patching: Wipes out the dead JCenter repositories and deletes the entire signing block cleanly
       - name: Patch Dead Repos and Delete Broken Windows Signing Configurations
         run: |
           sed -i 's/jcenter()/google()\n        mavenCentral()/g' Android-Project/build.gradle
@@ -40,6 +47,13 @@ jobs:
           # This wipes out the line that links the release build to those deleted configurations
           sed -i '/signingConfig signingConfigs.release/d' Android-Project/app/build.gradle
 
+      # Forces the old project wrapper to upgrade to 7.5 so Java 17 doesn't crash it
+      - name: Upgrade Legacy Gradle Wrapper
+        run: |
+          cd Android-Project
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-7.5-bin.zip/g' gradle/wrapper/gradle-wrapper.properties
+
+      # Ensures the Linux runner has permission to execute the upgraded build tool
       - name: Make Gradle Executable
         run: chmod +x Android-Project/gradlew
 
@@ -48,7 +62,7 @@ jobs:
         run: |
           echo "ndk.dir=$ANDROID_HOME/ndk/25.1.8937393" > Android-Project/local.properties
 
-      # Compiles the APKs using the system-wide JDK 17 (Gradle handles the internal Java 8 targeting automatically)
+      # Compiles your clean, high-performance APK deliverables
       - name: Build APKs with Gradle
         run: |
           cd Android-Project
@@ -60,7 +74,6 @@ jobs:
           name: HatchEngine-Debug-Slow
           path: Android-Project/app/build/outputs/apk/debug/app-debug.apk
 
-      # Updated output path: Modern Gradle names the unsigned file "app-release-unsigned.apk"
       - name: Upload Unsigned Release APK (Max Performance)
         uses: actions/upload-artifact@v4
         with:
